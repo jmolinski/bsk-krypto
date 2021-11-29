@@ -15,10 +15,33 @@
 
 from pwn import remote
 from flag3_exploit import exploit_flag3, FLAG3_PROBES
+from utils import rsa_encrypt
 
 
 def skip_menu(r) -> None:
     r.recvuntil(b"Choice: ")
+
+
+def get_flag_2():
+    r = remote("cryptotask.var.tailcall.net", 30000)
+
+    r.send(b"6\n")
+    skip_menu(r)
+    key = b""
+    while not key.endswith(b"-----END PUBLIC KEY-----\n"):
+        key += r.recvline(keepends=True)
+
+    token_int = int.from_bytes("flag".encode(), byteorder="big")
+    rsa_token = rsa_encrypt(key, token_int)
+    r.send(b"5\n")
+    skip_menu(r)
+
+    r.send(str(rsa_token).encode() + b"\n")
+    r.recvline()
+    flag2 = r.recvline().decode().strip().split()[-1]
+    r.close()
+
+    print("Captured flag 2:", flag2)
 
 
 def get_flag_3():
@@ -36,6 +59,7 @@ def get_flag_3():
 
 
 def main() -> None:
+    get_flag_2()
     get_flag_3()
 
 
