@@ -1,6 +1,3 @@
-import json
-import os
-import socket
 from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 
