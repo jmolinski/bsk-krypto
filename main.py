@@ -1,3 +1,7 @@
+# Autor Jakub Moliński
+# Exploity do zadania zaliczeniowego z krypto z BSK*, mimuw 2021
+
+
 import pwn
 from pwn import remote, context
 from flag3_exploit import exploit_flag3, FLAG3_PROBES
