@@ -1,21 +1,13 @@
-# FLAG1 - aes_encrypted flag, enc_flag1
-# option 1 encrypted flag
-# "f8dfa195ab5113d18ae72622c5a8c6da:47d1d5efc547ec5b45b57058885540d9d2a8caa50eda15609c17a25f9d:1fd4b01f8e10c8fff20961a4c11f133a"
-
-# https://en.wikipedia.org/wiki/RSA_(cryptosystem)
-# FLAG2 = Path("flag_2.txt").read_text().strip()
-
-# ???
-# FLAG3 = Path("flag_3.txt").read_text().strip()
-#
-# RSA_PRIV_KEY = Path("server.pem").read_text()
-
-# https://github.com/Gallopsled/pwntools
-
-
-from pwn import remote
+import pwn
+from pwn import remote, context
 from flag3_exploit import exploit_flag3, FLAG3_PROBES
-from utils import rsa_encrypt
+from utils import rsa_encrypt, aes_decrypt
+from utils import aes_encrypt_nonce, xor
+
+
+def get_remote_connection() -> pwn.remote:
+    context.log_level = "error"
+    return remote("cryptotask.var.tailcall.net", 30000)
 
 
 def skip_menu(r) -> None:
@@ -23,7 +15,7 @@ def skip_menu(r) -> None:
 
 
 def get_flag_2():
-    r = remote("cryptotask.var.tailcall.net", 30000)
+    r = get_remote_connection()
 
     r.send(b"6\n")
     skip_menu(r)
@@ -45,7 +37,7 @@ def get_flag_2():
 
 
 def get_flag_3():
-    r = remote("cryptotask.var.tailcall.net", 30000)
+    r = get_remote_connection()
 
     r.send(b"7\n" * FLAG3_PROBES)
 
@@ -58,7 +50,70 @@ def get_flag_3():
     r.close()
 
 
+def parse_nonce_cipher_tag(bts):
+    if isinstance(bts, bytes):
+        bts = bts.decode("ascii")
+    n, c, _ = bts.split(":")
+    n = bytes.fromhex(n)
+    c = bytes.fromhex(c)
+    return n, c
+
+
+def preprocess_injected_key(bts):
+    secret = b"0123456789abcdef"
+    return xor(bts, secret)
+
+
+def get_flag_1():
+    r = get_remote_connection()
+
+    skip_menu(r)
+    r.send(b"1\n")
+    flag_nonce, flag_ciphertext = parse_nonce_cipher_tag(r.recvline(keepends=False))
+
+    MSG = b"0" * 16
+
+    msgs = {}
+    for i in range(0, 16):
+        new_key_prefix = b"0" * i
+
+        r.send(b"2\n")
+        r.send(preprocess_injected_key(new_key_prefix).hex().encode("ascii") + b"\n")
+        skip_menu(r)
+        r.recvline()
+
+        r.send(b"3\n")
+        r.send(MSG.hex().encode() + b"\n")
+        skip_menu(r)
+        encrypted = r.recvline(keepends=False).split(b" ")[-1]
+        msgs[i] = (new_key_prefix, parse_nonce_cipher_tag(encrypted))
+
+    r.close()
+
+    correct_key_suffix = b""
+    for ids in range(15, -1, -1):
+        msg = msgs[ids]
+        key = msg[0]
+        nonce, ciphertext = msg[1]
+
+        for b in range(0, 256):
+            b = b.to_bytes(1, "big")
+            maybe_key = key + b + correct_key_suffix
+
+            _, cipher_try = aes_encrypt_nonce(maybe_key, MSG, nonce)
+            if cipher_try == ciphertext:
+                correct_key_suffix = b + correct_key_suffix
+                break
+        else:
+            print("recovery failed")
+            break
+
+    flag1 = aes_decrypt(correct_key_suffix, flag_ciphertext, flag_nonce).decode()
+    print("Captured flag 1:", flag1)
+
+
 def main() -> None:
+    get_flag_1()
     get_flag_2()
     get_flag_3()
 
