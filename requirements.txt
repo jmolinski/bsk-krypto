@@ -1,2 +1,4 @@
 black==21.11b1
 pycryptodome==3.11.0
+pwntools==4.7.0
+
