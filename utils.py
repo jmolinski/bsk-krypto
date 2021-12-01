@@ -29,6 +29,20 @@ def aes_encrypt(key, text):
     return cipher.nonce.hex() + ":" + ciphertext.hex() + ":" + tag.hex()
 
 
+def aes_decrypt(key, text, nonce):
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    return cipher.decrypt(text)
+
+
+def aes_encrypt_nonce(key, text, nonce=None):
+    if nonce is None:
+        cipher = AES.new(key, AES.MODE_GCM)
+    else:
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    ciphertext, tag = cipher.encrypt_and_digest(text)
+    return cipher.nonce, ciphertext
+
+
 # asymmetric cryptography
 
 
